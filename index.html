@@ -45,128 +45,605 @@
 <body>
 <div class="bg"></div>
 <div class="lo" id="lo"><div class="ld"></div><div class="lt" id="lt">Memuat data SKM dari Google Sheets...</div></div>
-<div class="hdr"><div class="hdr-i"><div class="hdr-t"><div class="hdr-ic"><i class="fas fa-hospital"></i></div><div class="hdr-h"><h1>Dashboard SKM RSUD Mimika</h1><p>Survey Kepuasan Masyarakat — Real-time Sync</p></div></div><div style="display:flex;align-items:center;gap:16px"><div class="syn"><div class="dot ld" id="dot"></div><span id="stxt">Menyinkronkan...</span></div><button class="btn" onclick="refresh()"><i class="fas fa-sync-alt" id="ric"></i> Refresh</button></div></div></div>
-<div class="mn" id="mc" style="display:none"><div class="kr" id="kr"></div><div class="fb" id="fb"></div><div class="cg" id="cg"></div><div class="ts"><h3><i class="fas fa-table"></i> Detail Nilai Per Unsur (NPU)</h3><div style="overflow-x:auto"><table class="dt" id="tb"></table></div></div><div class="ft">Dashboard SKM RSUD Mimika — Data tersinkron dari Google Sheets — Update: <span id="lu">-</span> — Method: <span id="fm">-</span></div></div>
+<div class="hdr"><div class="hdr-i"><div class="hdr-t"><div class="hdr-ic"><i class="fas fa-hospital"></i></div><div class="hdr-h"><h1>Dashboard SKM RSUD Mimika</h1><p>Survey Kepuasan Masyarakat &mdash; Real-time Sync</p></div></div><div style="display:flex;align-items:center;gap:16px"><div class="syn"><div class="dot ld" id="dot"></div><span id="stxt">Menyinkronkan...</span></div><button class="btn" onclick="refresh()"><i class="fas fa-sync-alt" id="ric"></i> Refresh</button></div></div></div>
+<div class="mn" id="mc" style="display:none"><div class="kr" id="kr"></div><div class="fb" id="fb"></div><div class="cg" id="cg"></div><div class="ts"><h3><i class="fas fa-table"></i> Detail Nilai Per Unsur (NPU)</h3><div style="overflow-x:auto"><table class="dt" id="tb"></table></div></div><div class="ft">Dashboard SKM RSUD Mimika &mdash; Data tersinkron dari Google Sheets &mdash; Update: <span id="lu">-</span> &mdash; Method: <span id="fm">-</span></div></div>
 <div class="es" id="es" style="display:none"><i class="fas fa-exclamation-triangle"></i><h3>Gagal Memuat Data</h3><p id="em"></p><button class="btn" onclick="refresh()"><i class="fas fa-sync-alt"></i> Coba Lagi</button></div>
 
 <script>
-// CONFIG
-const SHEET_ID='1d0ne2PUC0ppPZu9byH3_KVGGpzSmbUHXa8J1UywMyz0';
-const PUB_CSV='https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKRFBkIZHy-c8Es94dcyMg43OocyUvcOFJgB8i0zpjLALZdG4cjJzohb0jzdPZs6cqubhVnkLI1NL/pub?output=csv';
-const PROXY='https://api.allorigins.win/raw?url='+encodeURIComponent(PUB_CSV);
-const SKM_SCALE={A:{min:3.51,max:4,label:'Sangat Baik'},B:{min:3.01,max:3.5,label:'Baik'},C:{min:2.51,max:3,label:'Cukup'},D:{min:2,max:2.5,label:'Kurang'}};
-const RL={1:'a. Tidak/Buruk',2:'b. Kurang',3:'c. Sesuai/Baik',4:'d. Sangat Baik'};
-const RC={1:'#ef4444',2:'#f59e0b',3:'#3b82f6',4:'#10b981'};
-const cc=v=>v>=3.51?'#10b981':v>=3.01?'#3b82f6':v>=2.51?'#f59e0b':'#ef4444';
-const CO={responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#f1f5f9'}},tooltip:{backgroundColor:'#1e293b',titleColor:'#f1f5f9',bodyColor:'#94a3b8'}}};
-let pd=null,ch={},cf='all',fm='';
+/* ===== CONFIG ===== */
+const PUB_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKRFBkIZHy-c8Es94dcyMg43OocyUvcOFJgB8i0zpjLALZdG4cjJzohb0jzdPZs6cqubhVnkLI1NL/pub?output=csv';
+const CORS_PROXIES = [
+    'https://corsproxy.io/?' + encodeURIComponent(PUB_CSV),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(PUB_CSV)
+];
 
-// SKM letter-to-number
-function er(t){if(typeof t==='number'&&1<=t&&t<=5)return t;if(!t||typeof t!=='string')return null;const s=t.trim().toLowerCase();if(!s)return null;if(s[0]in{a:1,b:1,c:1,d:1,e:1}&&(s.length===1||s[1]in'. '))return{a:1,b:2,c:3,d:4,e:5}[s[0]];try{const v=parseInt(s);if(1<=v&&v<=5)return v}catch{}return null}
+const SKM_SCALE = {
+    A: { min: 3.51, max: 4.00, label: 'Sangat Baik' },
+    B: { min: 3.01, max: 3.50, label: 'Baik' },
+    C: { min: 2.51, max: 3.00, label: 'Cukup' },
+    D: { min: 2.00, max: 2.50, label: 'Kurang' }
+};
 
-// CSV Parser
-function pcsv(csv){const ls=csv.split('\n');function pl(l){const f=[];let i=0,fd='',iq=false;while(i<l.length){const c=l[i];if(iq){if(c==='"'&&l[i+1]=== '"'){fd+='"';i+=2}else if(c=== '"''){iq=false;i++}else{fd+=c;i++}}else{if(c=== '"''){iq=true;i++}else if(c===',''){f.push(fd.trim());fd='';i++}else{fd+=c;i++}}}f.push(fd.trim());return f}
-const hdr=pl(ls[0]),data=[];
-for(let r=1;r<ls.length;r++){if(!ls[r].trim())continue;const v=pl(ls[r]),o={};hdr.forEach((h,i)=>{let val=v[i]||'';const rt=er(val);if(rt!==null)o[h]=rt;else o[h]=val});data.push(o)}
-return{headers:hdr,data}}
+const RL = { 1:'a. Tidak/Buruk', 2:'b. Kurang', 3:'c. Sesuai/Baik', 4:'d. Sangat Baik' };
+const RC = { 1:'#ef4444', 2:'#f59e0b', 3:'#3b82f6', 4:'#10b981' };
 
-// Fetch — try multiple methods
-async function fetchData(){
-// Method 1: Gviz JSONP (CORS-free, works from any origin)
-try{const r=await gvizFetch();if(r&&r.data.length>0){fm='Gviz JSONP';return r}}catch{}
-// Method 2: Direct CSV (works from HTTPS origin like GitHub Pages)
-try{const r=await fetch(PUB_CSV,{mode:'cors'});if(r.ok){const csv=await r.text();const p=pcsv(csv);const qc=p.headers.filter(h=>h&&/^\d\./.test(h));const valid=p.data.filter(r=>qc.some(c=>typeof r[c]==='number'&&r[c]>0));if(valid.length>0){fm='Direct CSV';return{headers:p.headers,data:valid}}}}catch{}
-// Method 3: CORS proxy
-try{const r=await fetch(PROXY);if(r.ok){const csv=await r.text();const p=pcsv(csv);const qc=p.headers.filter(h=>h&&/^\d\./.test(h));const valid=p.data.filter(r=>qc.some(c=>typeof r[c]==='number'&&r[c]>0));if(valid.length>0){fm='CORS Proxy';return{headers:p.headers,data:valid}}}}catch{}
-throw new Error('All fetch methods failed. Pastikan Google Sheet sudah Publish to web dan Share: Anyone with the link can view.')
+const colorByGrade = v => v>=3.51?'#10b981':v>=3.01?'#3b82f6':v>=2.51?'#f59e0b':'#ef4444';
+const CHART_OPTS = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+        legend: { labels: { color:'#f1f5f9' } },
+        tooltip: { backgroundColor:'#1e293b', titleColor:'#f1f5f9', bodyColor:'#94a3b8' }
+    }
+};
+
+let pd = null, charts = {}, currentFilter = 'all', fetchMethod = '';
+
+/* ===== SKM letter-to-number conversion ===== */
+function extractRating(val) {
+    if (typeof val === 'number' && val >= 1 && val <= 5) return val;
+    if (!val || typeof val !== 'string') return null;
+    const s = val.trim().toLowerCase();
+    if (!s) return null;
+
+    // Letter ratings: a=1, b=2, c=3, d=4, e=5
+    const first = s.charAt(0);
+    if ('abcde'.includes(first) && (s.length === 1 || s.charAt(1) === '.' || s.charAt(1) === ' ')) {
+        return { a:1, b:2, c:3, d:4, e:5 }[first];
+    }
+
+    // Numeric
+    const n = parseInt(s, 10);
+    if (n >= 1 && n <= 5) return n;
+
+    return null;
 }
 
-function gvizFetch(){const cb='gv_'+Date.now();const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:${cb}`;return new Promise((res,rej)=>{const tm=setTimeout(()=>{cl();rej(new Error('timeout'))},12000);window[cb]=r=>{clearTimeout(tm);cl();if(r.status==='ok'){const t=r.table,h=t.cols.map(c=>c.label||c.id),d=t.rows.map(row=>{const o={};t.cols.forEach((c,i)=>{const cell=row.c[i];const raw=cell?(cell.v!==null?cell.v:(cell.f||'')):'';const rt=er(raw);if(rt!==null)o[c.label||c.id]=rt;else o[c.label||c.id]=raw};return o});const valid=d.filter(r=>h.some(c=>typeof r[c]==='number'&&r[c]>0));if(valid.length>0)res({headers:h,data:valid});else rej(new Error('No valid rows'))}else rej(new Error('Gviz:'+r.status))};const sc=document.createElement('script');sc.id='gvS';sc.src=url;sc.onerror=()=>{clearTimeout(tm);cl();rej(new Error('Gviz load fail'))};document.head.appendChild(sc);function cl(){delete window[cb];const s=document.getElementById('gvS');if(s)s.remove()}})}
+/* ===== CSV Parser (RFC 4180 compliant) ===== */
+function parseCSVLine(line) {
+    const fields = [];
+    let i = 0, field = '', inQuote = false;
 
-// Analysis
-function analyze(data,fields){
-const tsC=fields.filter(f=>/timestamp|waktu|tanggal|time|date/i.test(f)||f===fields[0]);
-const qC=fields.filter(f=>f&&/^\d\./.test(f));
-const rC=qC.filter(c=>{const v=data.map(r=>r[c]).filter(v=>typeof v==='number'&&v>0);return v.length>data.length*.05});
-const tC=fields.filter(f=>!tsC.includes(f)&&!rC.includes(f));
-let mx=4;if(rC.length>0){const av=rC.flatMap(c=>data.map(r=>r[c]).filter(v=>typeof v==='number'&&v>0));mx=av.length>0?Math.max(...av):4;mx=mx<=4?4:5}
-const gC=tC.filter(f=>{const u=[...new Set(data.map(r=>r[f]).filter(v=>v&&String(v).trim()))];return u.length>1&&u.length<=100&&u.length<data.length*.5});
-const npu={};rC.forEach(c=>{const v=data.map(r=>r[c]).filter(v=>typeof v==='number'&&v>0);npu[c]=v.length>0?v.reduce((a,b)=>a+b,0)/v.length:0});
-const nv=Object.values(npu).filter(v=>v>0),ikm=nv.length>0?nv.reduce((a,b)=>a+b,0)/nv.length:0;
-let qg='D';for(const[g,r]of Object.entries(SKM_SCALE)){if(ikm>=r.min&&ikm<=r.max){qg=g;break}}if(ikm>4)qg='A';
-const ql=SKM_SCALE[qg]?SKM_SCALE[qg].label:'Sangat Baik';
-const dist={};rC.forEach(c=>{dist[c]={};for(let i=1;i<=mx;i++)dist[c][i]=0;data.forEach(r=>{const v=r[c];if(typeof v==='number'&&v>=1&&v<=mx)dist[c][v]++})});
-const gc=gC.includes('Unit')?'Unit':(gC[0]||'');
-const ga={};if(gc){const units=[...new Set(data.map(r=>r[gc]).filter(v=>v&&String(v).trim()))];units.forEach(u=>{const gd=data.filter(r=>String(r[gc]).trim()===u);const gn={};rC.forEach(c=>{const v=gd.map(r=>r[c]).filter(v=>typeof v==='number'&&v>0);gn[c]=v.length>0?v.reduce((a,b)=>a+b,0)/v.length:0});const gv=Object.values(gn).filter(v=>v>0);const gi=gv.length>0?gv.reduce((a,b)=>a+b,0)/gv.length:0;let gg='D';for(const[g,r]of Object.entries(SKM_SCALE)){if(gi>=r.min&&gi<=r.max){gg=g;break}}if(gi>4)gg='A';ga[u]={npu:gn,ikm:gi,count:gd.length,grade:gg}})}
-const trend=[];if(tsC.length>0){const tsc=tsC[0],sorted=[...data].filter(r=>r[tsc]).sort((a,b)=>new Date(a[tsc])-new Date(b[tsc]));const bd={};sorted.forEach(r=>{let d;try{const dt=new Date(r[tsc]);d=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')}catch{d='N/A'}if(!bd[d])bd[d]=[];bd[d].push(r)});Object.entries(bd).forEach(([d,rs])=>{const dn={};rC.forEach(c=>{const v=rs.map(r=>r[c]).filter(v=>typeof v==='number'&&v>0);dn[c]=v.length>0?v.reduce((a,b)=>a+b,0)/v.length:0});const dv=Object.values(dn).filter(v=>v>0);trend.push({date:d,ikm:dv.length>0?dv.reduce((a,b)=>a+b,0)/dv.length:0,count:rs.length})})}
-return{fields,data,tsC,rC,tC,gC,mx,npu,ikm,qg,ql,dist,gc,ga,trend,total:data.length}}
+    while (i < line.length) {
+        const ch = line.charAt(i);
 
-const sn=c=>c.replace(/^\d+[\.\)]\s*/,'').replace(/^.*?:\s*/,'').substring(0,55);
-
-// RENDER
-function render(d){
-const q=SKM_SCALE[d.qg]||{label:'Sangat Baik'};
-document.getElementById('kr').innerHTML=[{i:'fa-users',l:'Total Responden',v:d.total,s:'Jumlah survei'},{i:'fa-chart-line',l:'IKM',v:d.ikm.toFixed(2),s:d.qg+' - '+d.ql},{i:'fa-percentage',l:'% Kepuasan',v:(d.ikm/d.mx*100).toFixed(1)+'%',s:'Skala 1-'+d.mx},{i:'fa-star',l:'Rata-rata NPU',v:(Object.values(d.npu).filter(v=>v>0).reduce((a,b)=>a+b,0)/Object.values(d.npu).filter(v=>v>0).length||0).toFixed(2),s:d.rC.length+' unsur'},{i:'fa-award',l:'Mutu Pelayanan',v:d.qg,s:d.ql}].map(k=>`<div class="kc"><div class="ki"><i class="fas ${k.i}"></i></div><div class="kl">${k.l}</div><div class="kv">${k.v}</div><div class="ks">${k.s}</div></div>`).join('');
-let fh='<span class="fl"><i class="fas fa-filter"></i> Unit:</span>';
-const units=Object.keys(d.ga).sort();fh+=`<select id="fg" onchange="af()"><option value="all">Semua Unit (${d.total})</option>${units.map(u=>`<option value="${u}">${u} (${d.ga[u].count})</option>`).join('')}</select>`;
-document.getElementById('fb').innerHTML=fh;
-rCharts(d);rTable(d);
-document.getElementById('lu').textContent=new Date().toLocaleString('id-ID');document.getElementById('fm').textContent=fm;
-document.getElementById('lo').classList.add('h');document.getElementById('mc').style.display='block';document.getElementById('es').style.display='none';
-document.getElementById('dot').className='dot';document.getElementById('stxt').textContent=`Online (${fm}) - ${d.total} responden`;
+        if (inQuote) {
+            if (ch === '"' && i + 1 < line.length && line.charAt(i + 1) === '"') {
+                // Escaped double-quote ""
+                field += '"';
+                i += 2;
+            } else if (ch === '"') {
+                // End of quoted field
+                inQuote = false;
+                i++;
+            } else {
+                field += ch;
+                i++;
+            }
+        } else {
+            if (ch === '"') {
+                // Start of quoted field
+                inQuote = true;
+                i++;
+            } else if (ch === ',') {
+                fields.push(field.trim());
+                field = '';
+                i++;
+            } else {
+                field += ch;
+                i++;
+            }
+        }
+    }
+    fields.push(field.trim());
+    return fields;
 }
 
-function af(){cf=document.getElementById('fg')?.value||'all';rCharts(pd);rTable(pd)}
-function gfa(d){if(cf==='all')return{npu:d.npu,ikm:d.ikm,qg:d.qg,dist:d.dist,count:d.total};const g=d.ga[cf];if(!g)return{npu:d.npu,ikm:d.ikm,qg:d.qg,dist:d.dist,count:d.total};const ds={};d.rC.forEach(c=>{ds[sn(c)]={};for(let i=1;i<=d.mx;i++)ds[sn(c)][i]=0});return{npu:g.npu,ikm:g.ikm,qg:g.grade,dist:ds,count:g.count}}
+function parseCSV(csvText) {
+    const lines = csvText.split(/\r?\n/);
+    const headers = parseCSVLine(lines[0]);
+    const data = [];
 
-function dc(){Object.values(ch).forEach(c=>c.destroy());ch={}}
-function ac(g,id,ic,t,f=false){const d=document.createElement('div');d.className=`cc${f?' cf':''}`;d.innerHTML=`<h3><i class="fas ${ic}"></i> ${t}</h3><div class="cw"><canvas id="${id}"></canvas></div>`;g.appendChild(d)}
+    for (let r = 1; r < lines.length; r++) {
+        if (!lines[r].trim()) continue;
+        const values = parseCSVLine(lines[r]);
+        const row = {};
+        headers.forEach((h, i) => {
+            const raw = values[i] || '';
+            const rating = extractRating(raw);
+            if (rating !== null) {
+                row[h] = rating;
+            } else {
+                row[h] = raw;
+            }
+        });
+        data.push(row);
+    }
 
-function rCharts(d){
-dc();const fa=gfa(d),g=document.getElementById('cg');g.innerHTML='';
-const lbl=d.rC.map(sn),vals=d.rC.map(c=>fa.npu[c]||0),cols=vals.map(cc);
+    return { headers, data };
+}
 
-// 1 NPU
-ac(g,'c1','fa-chart-bar','Nilai Per Unsur (NPU)');
-ch.npu=new Chart(document.getElementById('c1'),{type:'bar',data:{labels,datasets:[{label:`NPU (n=${fa.count})`,data:vals,backgroundColor:cols.map(c=>c+'33'),borderColor:cols,borderWidth:2,borderRadius:6}]},options:{...CO,indexAxis:lbl.length>8?'y':'x',scales:{y:{beginAtZero:true,max:d.mx+.5,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:45}}}}});
+/* ===== Fetch Data ===== */
+async function fetchData() {
+    const errors = [];
 
-// 2 Radar
-ac(g,'c2','fa-crosshairs','Radar Kepuasan');
-ch.rad=new Chart(document.getElementById('c2'),{type:'radar',data:{labels,datasets:[{label:`IKM: ${fa.ikm.toFixed(2)}`,data:vals,backgroundColor:'rgba(99,102,241,.15)',borderColor:'#6366f1',borderWidth:2,pointBackgroundColor:'#6366f1',pointBorderColor:'#fff',pointRadius:4}]},options:{...CO,scales:{r:{beginAtZero:true,max:d.mx+.5,grid:{color:'#334155'},angleLines:{color:'#334155'},pointLabels:{color:'#94a3b8',font:{size:10}},ticks:{color:'#94a3b8',backdropColor:'#0f172a'}}}}});
+    // Method 1: Direct CSV (CORS confirmed — Access-Control-Allow-Origin: *)
+    console.log('[SKM] Method 1: Direct CSV fetch');
+    try {
+        const response = await fetch(PUB_CSV, { mode: 'cors' });
+        if (response.ok) {
+            console.log('[SKM] Direct CSV: HTTP ' + response.status);
+            const csvText = await response.text();
+            console.log('[SKM] CSV size: ' + csvText.length + ' chars, ' + csvText.split(/\r?\n/).length + ' lines');
+            const parsed = parseCSV(csvText);
+            const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
+            const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
+            console.log('[SKM] Question columns: ' + qCols.length + ', Valid rows: ' + validRows.length + ' / ' + parsed.data.length);
+            if (validRows.length > 0) {
+                fetchMethod = 'Direct CSV';
+                return { headers: parsed.headers, data: validRows };
+            }
+            errors.push('Direct CSV: 0 valid rows after parsing');
+        } else {
+            errors.push('Direct CSV: HTTP ' + response.status);
+        }
+    } catch (e) {
+        errors.push('Direct CSV: ' + e.message);
+        console.error('[SKM] Direct CSV error:', e);
+    }
 
-// 3 Distribution (only all filter)
-if(cf==='all'&&d.dist){ac(g,'c3','fa-chart-area','Distribusi Penilaian');const ds=[];for(let i=1;i<=d.mx;i++)ds.push({label:RL[i]||`Nilai ${i}`,data:d.rC.map(c=>d.dist[c][i]||0),backgroundColor:(RC[i]||'#6366f1')+'55',borderColor:RC[i]||'#6366f1',borderWidth:1,borderRadius:4});
-ch.dist=new Chart(document.getElementById('c3'),{type:'bar',data:{labels,datasets:ds},options:{...CO,scales:{y:{stacked:true,beginAtZero:true,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},x:{stacked:true,grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:45}}}}})}
+    // Method 2: CORS proxies
+    for (let pi = 0; pi < CORS_PROXIES.length; pi++) {
+        const proxyUrl = CORS_PROXIES[pi];
+        console.log('[SKM] Method 2.' + (pi+1) + ': CORS Proxy');
+        try {
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                const csvText = await response.text();
+                // Check if it's actually CSV (not HTML error page)
+                if (!csvText.trim().startsWith('<!') && !csvText.trim().startsWith('<html')) {
+                    const parsed = parseCSV(csvText);
+                    const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
+                    const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
+                    if (validRows.length > 0) {
+                        fetchMethod = 'CORS Proxy #' + (pi+1);
+                        return { headers: parsed.headers, data: validRows };
+                    }
+                    errors.push('CORS Proxy #' + (pi+1) + ': 0 valid rows');
+                } else {
+                    errors.push('CORS Proxy #' + (pi+1) + ': returned HTML, not CSV');
+                }
+            } else {
+                errors.push('CORS Proxy #' + (pi+1) + ': HTTP ' + response.status);
+            }
+        } catch (e) {
+            errors.push('CORS Proxy #' + (pi+1) + ': ' + e.message);
+        }
+    }
 
-// 4 Doughnut
-ac(g,'c4','fa-circle-half-stroke','Distribusi Tingkat Kepuasan');
-const od={};for(let i=1;i<=d.mx;i++)od[i]=0;if(cf==='all'&&d.dist)for(const v of Object.values(d.dist))for(let i=1;i<=d.mx;i++)od[i]+=v[i]||0;
-const tv=Object.values(od).reduce((a,b)=>a+b,0);const pL=[],pD=[],pC=[];for(let i=d.mx;i>=1;i--)if(od[i]>0){pL.push(RL[i]);pD.push(od[i]);pC.push(RC[i])}
-ch.pie=new Chart(document.getElementById('c4'),{type:'doughnut',data:{labels:pL,datasets:[{data:pD,backgroundColor:pC.map(c=>c+'99'),borderColor:pC,borderWidth:2}]},options:{...CO,cutout:'55%',plugins:{...CO.plugins,legend:{position:'bottom',labels:{color:'#f1f5f9',padding:12}},tooltip:{...CO.plugins.tooltip,callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed} (${((ctx.parsed/tv)*100).toFixed(1)}%)`}}}}});
+    // All methods failed
+    const msg = 'Semua metode gagal: ' + errors.join('; ');
+    console.error('[SKM] All fetch methods failed:', errors);
+    throw new Error(msg);
+}
 
-// 5 Trend
-if(d.trend&&d.trend.length>1){ac(g,'c5','fa-timeline','Trend IKM per Bulan',true);
-ch.trend=new Chart(document.getElementById('c5'),{type:'line',data:{labels:d.trend.map(t=>t.date),datasets:[{label:'IKM',data:d.trend.map(t=>t.ikm),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.1)',borderWidth:2,fill:true,tension:.3,pointRadius:4,pointBackgroundColor:'#6366f1'},{label:'Responden',data:d.trend.map(t=>t.count),borderColor:'#f59e0b',borderWidth:2,fill:false,tension:.3,pointRadius:3,yAxisID:'y1'}]},options:{...CO,scales:{y:{beginAtZero:true,max:d.mx+.5,grid:{color:'#334155'},ticks:{color:'#94a3b8'},title:{display:true,text:'IKM',color:'#94a3b8'}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{color:'#94a3b8'},title:{display:true,text:'Responden',color:'#94a3b8'}},x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}}}}})}
+/* ===== Analysis ===== */
+function analyze(data, fields) {
+    // Identify column types
+    const tsCols = fields.filter(f => /timestamp|waktu|tanggal|time|date/i.test(f) || f === fields[0]);
+    const qCols = fields.filter(f => f && /^\d\./.test(f.trim()));
+    // Filter question columns that have enough numeric data
+    const rCols = qCols.filter(c => {
+        const vals = data.map(r => r[c]).filter(v => typeof v === 'number' && v > 0);
+        return vals.length > data.length * 0.05;
+    });
+    const textCols = fields.filter(f => !tsCols.includes(f) && !rCols.includes(f));
 
-// 6 Group comparison
-if(Object.keys(d.ga).length>1){const su=Object.keys(d.ga).sort((a,b)=>d.ga[b].ikm-d.ga[a].ikm),gv=su.map(u=>d.ga[u].ikm),gn=su.map(u=>d.ga[u].count),gc2=gv.map(cc);
-ac(g,'c6','fa-building','Perbandingan IKM per Unit',true);
-ch.grp=new Chart(document.getElementById('c6'),{type:'bar',data:{labels:su,datasets:[{label:'IKM',data:gv,backgroundColor:gc2.map(c=>c+'33'),borderColor:gc2,borderWidth:2,borderRadius:6}]},options:{...CO,scales:{y:{beginAtZero:true,max:d.mx+.5,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:45}}},plugins:{...CO.plugins,tooltip:{...CO.plugins.tooltip,callbacks:{afterLabel:ctx=>`Responden: ${gn[ctx.dataIndex]}`}}}}})}
+    // Determine max rating scale
+    let maxRating = 4;
+    if (rCols.length > 0) {
+        const allVals = rCols.flatMap(c => data.map(r => r[c]).filter(v => typeof v === 'number' && v > 0));
+        if (allVals.length > 0) {
+            maxRating = Math.max(...allVals);
+            maxRating = maxRating <= 4 ? 4 : 5;
+        }
+    }
 
-// 7 Demographics
-if(d.demographics){const dk=Object.keys(d.demographics);dk.forEach(k=>{if(k==='Jenis Kelamin'||k==='Pendidikan'){ac(g,'c_dem_'+k,k==='Jenis Kelamin'?'fa-venus-mars':'fa-graduation-cap',k);const lb=Object.keys(d.demographics[k]),vl=Object.values(d.demographics[k]),cl2=lb.map((_,i)=>['#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6','#8b5cf6','#06b6d4'][i%7]);
-ch['dem_'+k]=new Chart(document.getElementById('c_dem_'+k),{type:'doughnut',data:{labels:lb,datasets:[{data:vl,backgroundColor:cl2.map(c=>c+'99'),borderColor:cl2,borderWidth:2}]},options:{...CO,cutout:'45%',plugins:{...CO.plugins,legend:{position:'bottom',labels:{color:'#f1f5f9',padding:8}}}}})}})}
+    // Group columns (like Unit)
+    const groupCols = textCols.filter(f => {
+        const unique = [...new Set(data.map(r => r[f]).filter(v => v && String(v).trim()))];
+        return unique.length > 1 && unique.length <= 100 && unique.length < data.length * 0.5;
+    });
 
-function rTable(d){const fa=gfa(d);let h=`<thead><tr><th>No</th><th>Unsur Pelayanan</th><th>NPU</th><th>Skala</th><th>Mutu</th></tr></thead><tbody>`;
-d.rC.forEach((c,i)=>{const v=fa.npu[c]||0;let g='D';for(const[gr,r]of Object.entries(SKM_SCALE)){if(v>=r.min&&v<=r.max){g=gr;break}}if(v>4)g='A';h+=`<tr><td class="n">${i+1}</td><td>${sn(c)}</td><td class="n" style="font-weight:700;color:${cc(v)}">${v.toFixed(2)}</td><td class="n">1-${d.mx}</td><td><span class="qb q${g}">${g} - ${SKM_SCALE[g]?.label||'Sangat Baik'}</span></td></tr>`});
-h+=`<tr style="background:rgba(99,102,241,.1);font-weight:700"><td></td><td>IKM (Indeks Kepuasan Masyarakat)</td><td class="n" style="font-size:16px">${fa.ikm.toFixed(2)}</td><td class="n">1-${d.mx}</td><td><span class="qb q${fa.qg}" style="font-size:13px">${fa.qg} - ${SKM_SCALE[fa.qg]?.label||'Sangat Baik'}</span></td></tr></tbody>`;
-document.getElementById('tb').innerHTML=h}
+    // Calculate NPU (Nilai Per Unsur)
+    const npu = {};
+    rCols.forEach(c => {
+        const vals = data.map(r => r[c]).filter(v => typeof v === 'number' && v > 0);
+        npu[c] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    });
 
-async function refresh(){document.getElementById('ric').classList.add('fa-spin');document.getElementById('dot').className='dot ld';document.getElementById('stxt').textContent='Menyinkronkan...';
-try{const r=await fetchData();pd=analyze(r.data,r.headers);cf='all';render(pd)}catch(e){document.getElementById('lo').classList.add('h');document.getElementById('mc').style.display='none';document.getElementById('es').style.display='block';document.getElementById('em').textContent=e.message;document.getElementById('dot').className='dot off';document.getElementById('stxt').textContent='Offline'}
-document.getElementById('ric').classList.remove('fa-spin')}
+    // Calculate IKM (Indeks Kepuasan Masyarakat)
+    const npuValues = Object.values(npu).filter(v => v > 0);
+    const ikm = npuValues.length > 0 ? npuValues.reduce((a, b) => a + b, 0) / npuValues.length : 0;
 
-(async()=>{try{const r=await fetchData();pd=analyze(r.data,r.headers);render(pd)}catch(e){document.getElementById('lo').classList.add('h');document.getElementById('es').style.display='block';document.getElementById('em').textContent=e.message;document.getElementById('dot').className='dot off';document.getElementById('stxt').textContent='Offline'}})();
+    // Determine quality grade
+    let qualityGrade = 'D';
+    for (const [grade, range] of Object.entries(SKM_SCALE)) {
+        if (ikm >= range.min && ikm <= range.max) { qualityGrade = grade; break; }
+    }
+    if (ikm > 4) qualityGrade = 'A';
+    const qualityLabel = SKM_SCALE[qualityGrade] ? SKM_SCALE[qualityGrade].label : 'Sangat Baik';
+
+    // Distribution
+    const dist = {};
+    rCols.forEach(c => {
+        dist[c] = {};
+        for (let i = 1; i <= maxRating; i++) dist[c][i] = 0;
+        data.forEach(r => {
+            const v = r[c];
+            if (typeof v === 'number' && v >= 1 && v <= maxRating) dist[c][v]++;
+        });
+    });
+
+    // Group analysis (per Unit)
+    const groupColName = groupCols.includes('Unit') ? 'Unit' : (groupCols[0] || '');
+    const groupAnalysis = {};
+    if (groupColName) {
+        const units = [...new Set(data.map(r => r[groupColName]).filter(v => v && String(v).trim()))];
+        units.forEach(u => {
+            const groupData = data.filter(r => String(r[groupColName]).trim() === u);
+            const groupNpu = {};
+            rCols.forEach(c => {
+                const vals = groupData.map(r => r[c]).filter(v => typeof v === 'number' && v > 0);
+                groupNpu[c] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+            });
+            const groupVals = Object.values(groupNpu).filter(v => v > 0);
+            const groupIkm = groupVals.length > 0 ? groupVals.reduce((a, b) => a + b, 0) / groupVals.length : 0;
+            let groupGrade = 'D';
+            for (const [grade, range] of Object.entries(SKM_SCALE)) {
+                if (groupIkm >= range.min && groupIkm <= range.max) { groupGrade = grade; break; }
+            }
+            if (groupIkm > 4) groupGrade = 'A';
+            groupAnalysis[u] = { npu: groupNpu, ikm: groupIkm, count: groupData.length, grade: groupGrade };
+        });
+    }
+
+    // Trend (monthly)
+    const trend = [];
+    if (tsCols.length > 0) {
+        const tsCol = tsCols[0];
+        const sorted = [...data].filter(r => r[tsCol]).sort((a, b) => new Date(a[tsCol]) - new Date(b[tsCol]));
+        const byDate = {};
+        sorted.forEach(r => {
+            let dateKey;
+            try {
+                const dt = new Date(r[tsCol]);
+                dateKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+            } catch { dateKey = 'N/A'; }
+            if (!byDate[dateKey]) byDate[dateKey] = [];
+            byDate[dateKey].push(r);
+        });
+        Object.entries(byDate).forEach(([dateKey, rows]) => {
+            const dateNpu = {};
+            rCols.forEach(c => {
+                const vals = rows.map(r => r[c]).filter(v => typeof v === 'number' && v > 0);
+                dateNpu[c] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+            });
+            const dateVals = Object.values(dateNpu).filter(v => v > 0);
+            trend.push({
+                date: dateKey,
+                ikm: dateVals.length > 0 ? dateVals.reduce((a, b) => a + b, 0) / dateVals.length : 0,
+                count: rows.length
+            });
+        });
+    }
+
+    return {
+        fields, data, tsCols, rCols, textCols, groupCols,
+        maxRating, npu, ikm, qualityGrade, qualityLabel,
+        dist, groupColName, groupAnalysis, trend,
+        total: data.length
+    };
+}
+
+/* Short name for question columns */
+const shortName = c => c.replace(/^\d+[\.\)]\s*/, '').replace(/^.*?:\s*/, '').substring(0, 55);
+
+/* ===== RENDER ===== */
+function render(d) {
+    // KPI cards
+    const avgNpu = Object.values(d.npu).filter(v => v > 0);
+    const avgNpuVal = avgNpu.length > 0 ? avgNpu.reduce((a,b) => a+b, 0) / avgNpu.length : 0;
+    const kpis = [
+        { icon:'fa-users', label:'Total Responden', value:d.total, sub:'Jumlah survei' },
+        { icon:'fa-chart-line', label:'IKM', value:d.ikm.toFixed(2), sub:d.qualityGrade + ' - ' + d.qualityLabel },
+        { icon:'fa-percentage', label:'% Kepuasan', value:(d.ikm/d.maxRating*100).toFixed(1)+'%', sub:'Skala 1-'+d.maxRating },
+        { icon:'fa-star', label:'Rata-rata NPU', value:avgNpuVal.toFixed(2), sub:d.rCols.length+' unsur' },
+        { icon:'fa-award', label:'Mutu Pelayanan', value:d.qualityGrade, sub:d.qualityLabel }
+    ];
+    document.getElementById('kr').innerHTML = kpis.map(k =>
+        '<div class="kc"><div class="ki"><i class="fas '+k.icon+'"></i></div><div class="kl">'+k.label+'</div><div class="kv">'+k.value+'</div><div class="ks">'+k.sub+'</div></div>'
+    ).join('');
+
+    // Unit filter
+    const units = Object.keys(d.groupAnalysis).sort();
+    let filterHtml = '<span class="fl"><i class="fas fa-filter"></i> Unit:</span>';
+    filterHtml += '<select id="fg" onchange="applyFilter()">';
+    filterHtml += '<option value="all">Semua Unit (' + d.total + ')</option>';
+    filterHtml += units.map(u => '<option value="'+u+'">'+u+' ('+d.groupAnalysis[u].count+')</option>').join('');
+    filterHtml += '</select>';
+    document.getElementById('fb').innerHTML = filterHtml;
+
+    renderCharts(d);
+    renderTable(d);
+
+    // Footer info
+    document.getElementById('lu').textContent = new Date().toLocaleString('id-ID');
+    document.getElementById('fm').textContent = fetchMethod;
+    // Show UI
+    document.getElementById('lo').classList.add('h');
+    document.getElementById('mc').style.display = 'block';
+    document.getElementById('es').style.display = 'none';
+    document.getElementById('dot').className = 'dot';
+    document.getElementById('stxt').textContent = 'Online (' + fetchMethod + ') - ' + d.total + ' responden';
+}
+
+function applyFilter() {
+    currentFilter = document.getElementById('fg') ? document.getElementById('fg').value : 'all';
+    renderCharts(pd);
+    renderTable(pd);
+}
+
+function getFilteredAnalysis(d) {
+    if (currentFilter === 'all') {
+        return { npu: d.npu, ikm: d.ikm, qualityGrade: d.qualityGrade, dist: d.dist, count: d.total };
+    }
+    const g = d.groupAnalysis[currentFilter];
+    if (!g) return { npu: d.npu, ikm: d.ikm, qualityGrade: d.qualityGrade, dist: d.dist, count: d.total };
+    const ds = {};
+    d.rCols.forEach(c => {
+        ds[shortName(c)] = {};
+        for (let i = 1; i <= d.maxRating; i++) ds[shortName(c)][i] = 0;
+    });
+    return { npu: g.npu, ikm: g.ikm, qualityGrade: g.grade, dist: ds, count: g.count };
+}
+
+/* ===== CHARTS ===== */
+function destroyCharts() { Object.values(charts).forEach(c => c.destroy()); charts = {}; }
+
+function addChartCard(grid, id, icon, title, fullWidth) {
+    const div = document.createElement('div');
+    div.className = 'cc' + (fullWidth ? ' cf' : '');
+    div.innerHTML = '<h3><i class="fas ' + icon + '"></i> ' + title + '</h3><div class="cw"><canvas id="' + id + '"></canvas></div>';
+    grid.appendChild(div);
+}
+
+function renderCharts(d) {
+    destroyCharts();
+    const fa = getFilteredAnalysis(d);
+    const grid = document.getElementById('cg');
+    grid.innerHTML = '';
+    const labels = d.rCols.map(shortName);
+    const values = d.rCols.map(c => fa.npu[c] || 0);
+    const barColors = values.map(colorByGrade);
+
+    // 1. NPU Bar Chart
+    addChartCard(grid, 'c1', 'fa-chart-bar', 'Nilai Per Unsur (NPU)');
+    charts.npu = new Chart(document.getElementById('c1'), {
+        type: 'bar',
+        data: { labels, datasets: [{
+            label: 'NPU (n=' + fa.count + ')',
+            data: values,
+            backgroundColor: barColors.map(c => c + '33'),
+            borderColor: barColors,
+            borderWidth: 2, borderRadius: 6
+        }] },
+        options: { ...CHART_OPTS,
+            indexAxis: labels.length > 8 ? 'y' : 'x',
+            scales: {
+                y: { beginAtZero:true, max:d.maxRating+0.5, grid:{color:'#334155'}, ticks:{color:'#94a3b8'} },
+                x: { grid:{color:'#334155'}, ticks:{color:'#94a3b8', maxRotation:45} }
+            }
+        }
+    });
+
+    // 2. Radar
+    addChartCard(grid, 'c2', 'fa-crosshairs', 'Radar Kepuasan');
+    charts.rad = new Chart(document.getElementById('c2'), {
+        type: 'radar',
+        data: { labels, datasets: [{
+            label: 'IKM: ' + fa.ikm.toFixed(2),
+            data: values,
+            backgroundColor:'rgba(99,102,241,.15)',
+            borderColor:'#6366f1', borderWidth:2,
+            pointBackgroundColor:'#6366f1', pointBorderColor:'#fff', pointRadius:4
+        }] },
+        options: { ...CHART_OPTS,
+            scales: { r: {
+                beginAtZero:true, max:d.maxRating+0.5,
+                grid:{color:'#334155'}, angleLines:{color:'#334155'},
+                pointLabels:{color:'#94a3b8', font:{size:10}},
+                ticks:{color:'#94a3b8', backdropColor:'#0f172a'}
+            }}
+        }
+    });
+
+    // 3. Distribution (stacked) — only when "all" filter
+    if (currentFilter === 'all' && d.dist) {
+        addChartCard(grid, 'c3', 'fa-chart-area', 'Distribusi Penilaian');
+        const ds = [];
+        for (let i = 1; i <= d.maxRating; i++) {
+            ds.push({
+                label: RL[i] || ('Nilai ' + i),
+                data: d.rCols.map(c => d.dist[c][i] || 0),
+                backgroundColor: (RC[i]||'#6366f1') + '55',
+                borderColor: RC[i]||'#6366f1',
+                borderWidth: 1, borderRadius: 4
+            });
+        }
+        charts.dist = new Chart(document.getElementById('c3'), {
+            type: 'bar',
+            data: { labels, datasets: ds },
+            options: { ...CHART_OPTS,
+                scales: {
+                    y: { stacked:true, beginAtZero:true, grid:{color:'#334155'}, ticks:{color:'#94a3b8'} },
+                    x: { stacked:true, grid:{color:'#334155'}, ticks:{color:'#94a3b8', maxRotation:45} }
+                }
+            }
+        });
+    }
+
+    // 4. Doughnut — satisfaction distribution
+    addChartCard(grid, 'c4', 'fa-circle-half-stroke', 'Distribusi Tingkat Kepuasan');
+    const overallDist = {};
+    for (let i = 1; i <= d.maxRating; i++) overallDist[i] = 0;
+    if (currentFilter === 'all' && d.dist) {
+        for (const v of Object.values(d.dist)) {
+            for (let i = 1; i <= d.maxRating; i++) overallDist[i] += v[i] || 0;
+        }
+    }
+    const totalResponses = Object.values(overallDist).reduce((a,b) => a+b, 0);
+    const pieLabels = [], pieData = [], pieColors = [];
+    for (let i = d.maxRating; i >= 1; i--) {
+        if (overallDist[i] > 0) {
+            pieLabels.push(RL[i]);
+            pieData.push(overallDist[i]);
+            pieColors.push(RC[i]);
+        }
+    }
+    charts.pie = new Chart(document.getElementById('c4'), {
+        type: 'doughnut',
+        data: { labels: pieLabels, datasets: [{
+            data: pieData,
+            backgroundColor: pieColors.map(c => c + '99'),
+            borderColor: pieColors, borderWidth: 2
+        }] },
+        options: { ...CHART_OPTS, cutout:'55%',
+            plugins: { ...CHART_OPTS.plugins,
+                legend: { position:'bottom', labels:{color:'#f1f5f9', padding:12} },
+                tooltip: { ...CHART_OPTS.plugins.tooltip,
+                    callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' (' + ((ctx.parsed/totalResponses)*100).toFixed(1) + '%)' }
+                }
+            }
+        }
+    });
+
+    // 5. Trend line
+    if (d.trend && d.trend.length > 1) {
+        addChartCard(grid, 'c5', 'fa-timeline', 'Trend IKM per Bulan', true);
+        charts.trend = new Chart(document.getElementById('c5'), {
+            type: 'line',
+            data: {
+                labels: d.trend.map(t => t.date),
+                datasets: [
+                    { label:'IKM', data:d.trend.map(t=>t.ikm), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.1)', borderWidth:2, fill:true, tension:.3, pointRadius:4, pointBackgroundColor:'#6366f1' },
+                    { label:'Responden', data:d.trend.map(t=>t.count), borderColor:'#f59e0b', borderWidth:2, fill:false, tension:.3, pointRadius:3, yAxisID:'y1' }
+                ]
+            },
+            options: { ...CHART_OPTS,
+                scales: {
+                    y: { beginAtZero:true, max:d.maxRating+0.5, grid:{color:'#334155'}, ticks:{color:'#94a3b8'}, title:{display:true,text:'IKM',color:'#94a3b8'} },
+                    y1: { position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, ticks:{color:'#94a3b8'}, title:{display:true,text:'Responden',color:'#94a3b8'} },
+                    x: { grid:{color:'#334155'}, ticks:{color:'#94a3b8'} }
+                }
+            }
+        });
+    }
+
+    // 6. Group comparison (per Unit)
+    if (Object.keys(d.groupAnalysis).length > 1) {
+        const sortedUnits = Object.keys(d.groupAnalysis).sort((a,b) => d.groupAnalysis[b].ikm - d.groupAnalysis[a].ikm);
+        const groupValues = sortedUnits.map(u => d.groupAnalysis[u].ikm);
+        const groupCounts = sortedUnits.map(u => d.groupAnalysis[u].count);
+        const groupColors = groupValues.map(colorByGrade);
+        addChartCard(grid, 'c6', 'fa-building', 'Perbandingan IKM per Unit', true);
+        charts.grp = new Chart(document.getElementById('c6'), {
+            type: 'bar',
+            data: { labels: sortedUnits, datasets: [{
+                label: 'IKM', data: groupValues,
+                backgroundColor: groupColors.map(c => c + '33'),
+                borderColor: groupColors, borderWidth: 2, borderRadius: 6
+            }] },
+            options: { ...CHART_OPTS,
+                scales: {
+                    y: { beginAtZero:true, max:d.maxRating+0.5, grid:{color:'#334155'}, ticks:{color:'#94a3b8'} },
+                    x: { grid:{color:'#334155'}, ticks:{color:'#94a3b8', maxRotation:45} }
+                },
+                plugins: { ...CHART_OPTS.plugins,
+                    tooltip: { ...CHART_OPTS.plugins.tooltip,
+                        callbacks: { afterLabel: ctx => 'Responden: ' + groupCounts[ctx.dataIndex] }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/* ===== TABLE ===== */
+function renderTable(d) {
+    const fa = getFilteredAnalysis(d);
+    let html = '<thead><tr><th>No</th><th>Unsur Pelayanan</th><th>NPU</th><th>Skala</th><th>Mutu</th></tr></thead><tbody>';
+
+    d.rCols.forEach((c, i) => {
+        const v = fa.npu[c] || 0;
+        let grade = 'D';
+        for (const [g, range] of Object.entries(SKM_SCALE)) {
+            if (v >= range.min && v <= range.max) { grade = g; break; }
+        }
+        if (v > 4) grade = 'A';
+        html += '<tr><td class="n">' + (i+1) + '</td><td>' + shortName(c) + '</td>';
+        html += '<td class="n" style="font-weight:700;color:' + colorByGrade(v) + '">' + v.toFixed(2) + '</td>';
+        html += '<td class="n">1-' + d.maxRating + '</td>';
+        html += '<td><span class="qb q' + grade + '">' + grade + ' - ' + (SKM_SCALE[grade]?.label||'Sangat Baik') + '</span></td></tr>';
+    });
+
+    html += '<tr style="background:rgba(99,102,241,.1);font-weight:700"><td></td><td>IKM (Indeks Kepuasan Masyarakat)</td>';
+    html += '<td class="n" style="font-size:16px">' + fa.ikm.toFixed(2) + '</td>';
+    html += '<td class="n">1-' + d.maxRating + '</td>';
+    html += '<td><span class="qb q' + fa.qualityGrade + '" style="font-size:13px">' + fa.qualityGrade + ' - ' + (SKM_SCALE[fa.qualityGrade]?.label||'Sangat Baik') + '</span></td></tr></tbody>';
+
+    document.getElementById('tb').innerHTML = html;
+}
+
+/* ===== REFRESH ===== */
+async function refresh() {
+    document.getElementById('ric').classList.add('fa-spin');
+    document.getElementById('dot').className = 'dot ld';
+    document.getElementById('stxt').textContent = 'Menyinkronkan...';
+
+    try {
+        const result = await fetchData();
+        pd = analyze(result.data, result.headers);
+        currentFilter = 'all';
+        render(pd);
+    } catch (e) {
+        document.getElementById('lo').classList.add('h');
+        document.getElementById('mc').style.display = 'none';
+        document.getElementById('es').style.display = 'block';
+        document.getElementById('em').textContent = e.message;
+        document.getElementById('dot').className = 'dot off';
+        document.getElementById('stxt').textContent = 'Offline';
+        console.error('[SKM] Error:', e);
+    }
+
+    document.getElementById('ric').classList.remove('fa-spin');
+}
+
+/* ===== INIT ===== */
+(async () => {
+    try {
+        const result = await fetchData();
+        pd = analyze(result.data, result.headers);
+        render(pd);
+    } catch (e) {
+        document.getElementById('lo').classList.add('h');
+        document.getElementById('es').style.display = 'block';
+        document.getElementById('em').textContent = e.message;
+        document.getElementById('dot').className = 'dot off';
+        document.getElementById('stxt').textContent = 'Offline';
+        console.error('[SKM] Init error:', e);
+    }
+})();
 </script>
 </body>
 </html>
