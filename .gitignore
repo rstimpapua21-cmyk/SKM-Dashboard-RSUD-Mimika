@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+repo_config.json
+verify_data.py
+check_data.py
+analyze.py
+api_dump.json
+*.json

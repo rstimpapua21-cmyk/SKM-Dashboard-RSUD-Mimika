@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard SKM RSUD Mimika</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root{--primary:#6366f1;--primary-light:#818cf8;--accent:#f59e0b;--success:#10b981;--danger:#ef4444;--bg-dark:#0f172a;--bg-card:#1e293b;--bg-card-hover:#334155;--text-primary:#f1f5f9;--text-secondary:#94a3b8;--text-muted:#64748b;--border:#334155;--g1:linear-gradient(135deg,#6366f1,#8b5cf6);--g2:linear-gradient(135deg,#f59e0b,#ef4444);--g3:linear-gradient(135deg,#10b981,#06b6d4);--g4:linear-gradient(135deg,#3b82f6,#6366f1)}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg-dark);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+        .bg-animated{position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse at 20% 50%,rgba(99,102,241,.08) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(245,158,11,.06) 0%,transparent 50%),radial-gradient(ellipse at 50% 80%,rgba(16,185,129,.05) 0%,transparent 50%),var(--bg-dark)}
+        .header{background:rgba(30,41,59,.8);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:16px 24px;position:sticky;top:0;z-index:100}
+        .header-inner{max-width:1400px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
+        .header-title{display:flex;align-items:center;gap:12px}
+        .header-icon{width:40px;height:40px;border-radius:10px;background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:20px;color:white}
+        .header-text h1{font-size:18px;font-weight:700}
+        .header-text p{font-size:12px;color:var(--text-secondary);margin-top:2px}
+        .sync-status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)}
+        .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+        .sync-dot.offline{background:var(--danger);animation:none}
+        .sync-dot.loading{background:var(--accent);animation:pulse .8s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .btn-refresh{background:var(--g1);color:white;border:none;padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:transform .15s}
+        .btn-refresh:hover{transform:scale(1.05)}.btn-refresh:active{transform:scale(.95)}
+        .main{max-width:1400px;margin:0 auto;padding:24px}
+        .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+        .kpi-card{background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border);position:relative;overflow:hidden;transition:transform .2s}
+        .kpi-card:hover{transform:translateY(-2px)}
+        .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+        .kpi-card:nth-child(1)::before{background:var(--g1)}.kpi-card:nth-child(2)::before{background:var(--g2)}.kpi-card:nth-child(3)::before{background:var(--g3)}.kpi-card:nth-child(4)::before{background:var(--g4)}.kpi-card:nth-child(5)::before{background:var(--g1)}
+        .kpi-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px}
+        .kpi-card:nth-child(1) .kpi-icon{background:rgba(99,102,241,.15);color:var(--primary-light)}.kpi-card:nth-child(2) .kpi-icon{background:rgba(245,158,11,.15);color:var(--accent)}.kpi-card:nth-child(3) .kpi-icon{background:rgba(16,185,129,.15);color:var(--success)}.kpi-card:nth-child(4) .kpi-icon{background:rgba(59,130,246,.15);color:#3b82f6}.kpi-card:nth-child(5) .kpi-icon{background:rgba(139,92,246,.15);color:#8b5cf6}
+        .kpi-label{font-size:12px;color:var(--text-secondary);margin-bottom:6px}
+        .kpi-value{font-size:28px;font-weight:700}.kpi-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
+        .charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+        .chart-card{background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border);transition:transform .2s}
+        .chart-card:hover{transform:translateY(-2px)}
+        .chart-card h3{font-size:14px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+        .chart-card h3 i{color:var(--primary-light)}
+        .chart-wrapper{position:relative;width:100%}
+        .chart-full{grid-column:1/-1}
+        .table-section{background:var(--bg-card);border-radius:16px;padding:20px;border:1px solid var(--border);margin-bottom:24px}
+        .table-section h3{font-size:14px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+        .data-table{width:100%;border-collapse:collapse;font-size:13px}
+        .data-table th{background:rgba(99,102,241,.1);padding:10px 12px;text-align:left;font-weight:600;border-bottom:2px solid var(--primary);white-space:nowrap}
+        .data-table td{padding:8px 12px;border-bottom:1px solid var(--border)}
+        .data-table tr:hover td{background:var(--bg-card-hover)}
+        .data-table .numeric{text-align:center;font-weight:600}
+        .quality-badge{display:inline-block;padding:2px 10px;border-radius:6px;font-size:11px;font-weight:700}
+        .quality-A{background:rgba(16,185,129,.2);color:#10b981}.quality-B{background:rgba(59,130,246,.2);color:#3b82f6}.quality-C{background:rgba(245,158,11,.2);color:#f59e0b}.quality-D{background:rgba(239,68,68,.2);color:#ef4444}
+        .loading-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg-dark);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .3s}
+        .loading-overlay.hidden{opacity:0;pointer-events:none}
+        .loader{width:48px;height:48px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--primary);animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading-text{font-size:14px;color:var(--text-secondary)}
+        .error-state{text-align:center;padding:60px 24px}
+        .error-state i{font-size:48px;color:var(--danger);margin-bottom:16px}
+        .error-state h3{font-size:18px;margin-bottom:8px}.error-state p{font-size:13px;color:var(--text-secondary);margin-bottom:16px}
+        .filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+        .filter-bar select{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer}
+        .filter-bar select:focus{border-color:var(--primary);outline:none}
+        .filter-label{font-size:12px;color:var(--text-secondary)}
+        .footer{text-align:center;padding:16px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border)}
+        @media(max-width:768px){.charts-grid{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}.main{padding:16px}.header-inner{flex-wrap:wrap}}
+        @media(max-width:480px){.kpi-row{grid-template-columns:1fr}}
+        ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg-dark)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    </style>
+</head>
+<body>
+    <div class="bg-animated"></div>
+    <div class="loading-overlay" id="loading"><div class="loader"></div><div class="loading-text">Memuat data SKM...</div></div>
+    <div class="header"><div class="header-inner">
+        <div class="header-title"><div class="header-icon"><i class="fas fa-hospital"></i></div><div class="header-text"><h1>Dashboard SKM RSUD Mimika</h1><p>Survey Kepuasan Masyarakat &mdash; Real-time Sync</p></div></div>
+        <div style="display:flex;align-items:center;gap:16px"><div class="sync-status"><div class="sync-dot loading" id="syncDot"></div><span id="syncText">Menyinkronkan...</span></div><button class="btn-refresh" onclick="refreshData()"><i class="fas fa-sync-alt" id="refreshIcon"></i> Refresh</button></div>
+    </div></div>
+    <div class="main" id="mainContent" style="display:none">
+        <div class="kpi-row" id="kpiRow"></div>
+        <div class="filter-bar" id="filterBar"></div>
+        <div class="charts-grid" id="chartsGrid"></div>
+        <div class="table-section"><h3><i class="fas fa-table"></i> Detail Nilai Per Unsur (NPU)</h3><div style="overflow-x:auto"><table class="data-table" id="detailTable"></table></div></div>
+        <div class="footer">Dashboard SKM RSUD Mimika &mdash; Update: <span id="lastUpdate">-</span> &mdash; Method: <span id="fetchMethod">-</span></div>
+    </div>
+    <div class="error-state" id="errorState" style="display:none"><i class="fas fa-exclamation-triangle"></i><h3>Gagal Memuat Data</h3><p id="errorMsg"></p><button class="btn-refresh" onclick="refreshData()"><i class="fas fa-sync-alt"></i> Coba Lagi</button></div>
+
+<script>
+const API = window.location.origin + '/api/metrics';
+const API_REFRESH = window.location.origin + '/api/refresh';
+const REFRESH_INTERVAL = 5*60*1000;
+const SKM_SCALE = {A:{min:3.51,max:4,label:'Sangat Baik'},B:{min:3.01,max:3.5,label:'Baik'},C:{min:2.51,max:3,label:'Cukup'},D:{min:2,max:2.5,label:'Kurang'}};
+const ratingLabel = {1:'a. Tidak/Buruk',2:'b. Kurang',3:'c. Sesuai',4:'d. Sangat Baik'};
+const ratingColor = {1:'#ef4444',2:'#f59e0b',3:'#3b82f6',4:'#10b981'};
+const cc = v => v>=3.51?'#10b981':v>=3.01?'#3b82f6':v>=2.51?'#f59e0b':'#ef4444';
+const CO = {responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#f1f5f9'}},tooltip:{backgroundColor:'#1e293b',titleColor:'#f1f5f9',bodyColor:'#94a3b8'}}};
+
+let metrics = null, charts = {}, refreshTimer = null, currentFilter = 'all';
+
+async function fetchMetrics() {
+    const resp = await fetch(API);
+    if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'Unknown error');
+    metrics = data;
+    return data;
+}
+
+function renderDashboard(m) {
+    // KPIs
+    const q = SKM_SCALE[m.qualityGrade] || {label:'Sangat Baik'};
+    document.getElementById('kpiRow').innerHTML = [
+        {i:'fa-users',l:'Total Responden',v:m.totalRespondents,s:'Jumlah survei'},
+        {i:'fa-chart-line',l:'IKM',v:m.ikm.toFixed(2),s:`${m.qualityGrade} - ${m.qualityLabel}`},
+        {i:'fa-percentage',l:'% Kepuasan',v:`${m.ikmPercent}%`,s:`Skala 1-${m.maxRating}`},
+        {i:'fa-star',l:'Rata-rata NPU',v:(Object.values(m.npu).filter(v=>v>0).reduce((a,b)=>a+b,0)/Object.values(m.npu).filter(v=>v>0).length||0).toFixed(2),s:`${m.questionCols.length} unsur`},
+        {i:'fa-award',l:'Mutu Pelayanan',v:m.qualityGrade,s:m.qualityLabel},
+    ].map(k=>`<div class="kpi-card"><div class="kpi-icon"><i class="fas ${k.i}"></i></div><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
+    // Filter
+    let fh = '<span class="filter-label"><i class="fas fa-filter"></i> Unit:</span>';
+    const units = Object.keys(m.groupAnalysis).sort();
+    fh += `<select id="filterGroup" onchange="applyFilter()"><option value="all">Semua Unit (${m.totalRespondents})</option>${units.map(u=>`<option value="${u}">${u} (${m.groupAnalysis[u].count})</option>`).join('')}</select>`;
+    document.getElementById('filterBar').innerHTML = fh;
+
+    renderCharts(m);
+    renderTable(m);
+
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('id-ID');
+    document.getElementById('fetchMethod').textContent = m.method || 'server-proxy';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('errorState').style.display = 'none';
+    document.getElementById('syncDot').className = 'sync-dot';
+    document.getElementById('syncText').textContent = `Online - ${m.totalRespondents} responden`;
+}
+
+function applyFilter() { currentFilter = document.getElementById('filterGroup')?.value || 'all'; renderCharts(metrics); renderTable(metrics); }
+
+function getFilteredAnalysis(m) {
+    if (currentFilter === 'all') return { npu: m.npu, ikm: m.ikm, qualityGrade: m.qualityGrade, distribution: m.distribution, count: m.totalRespondents };
+    const g = m.groupAnalysis[currentFilter];
+    if (!g) return { npu: m.npu, ikm: m.ikm, qualityGrade: m.qualityGrade, distribution: m.distribution, count: m.totalRespondents };
+    // Compute overall distribution for this unit from question-level data
+    const dist = {};
+    for (const [q, npu_val] of Object.entries(g.npu)) {
+        dist[q] = {};
+        for (let i = 1; i <= m.maxRating; i++) dist[q][i] = 0;
+        // Estimate distribution from NPU (approximate)
+        // For accurate distribution we'd need raw data, but we show unit-level NPU
+    }
+    return { npu: g.npu, ikm: g.ikm, qualityGrade: g.grade, distribution: dist, count: g.count };
+}
+
+function destroyCharts() { Object.values(charts).forEach(c=>c.destroy()); charts={}; }
+function addCard(grid,id,icon,title,full=false) { const d=document.createElement('div'); d.className=`chart-card${full?' chart-full':''}`; d.innerHTML=`<h3><i class="fas ${icon}"></i> ${title}</h3><div class="chart-wrapper"><canvas id="${id}"></canvas></div>`; grid.appendChild(d); }
+
+function renderCharts(m) {
+    destroyCharts();
+    const fa = getFilteredAnalysis(m);
+    const grid = document.getElementById('chartsGrid');
+    grid.innerHTML = '';
+    const labels = Object.keys(fa.npu);
+    const vals = Object.values(fa.npu);
+    const colors = vals.map(cc);
+
+    // 1 - NPU Bar
+    addCard(grid,'cNPU','fa-chart-bar','Nilai Per Unsur (NPU)');
+    charts.npu = new Chart(document.getElementById('cNPU'), {
+        type:'bar', data:{labels, datasets:[{label:`NPU (n=${fa.count})`,data:vals,backgroundColor:colors.map(c=>c+'33'),borderColor:colors,borderWidth:2,borderRadius:6}]},
+        options:{...CO, indexAxis:labels.length>8?'y':'x',
+            scales:{y:{beginAtZero:true,max:m.maxRating+.5,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:45}}}}
+    });
+
+    // 2 - Radar
+    addCard(grid,'cRadar','fa-crosshairs','Radar Kepuasan');
+    charts.radar = new Chart(document.getElementById('cRadar'), {
+        type:'radar', data:{labels, datasets:[{label:`IKM: ${fa.ikm.toFixed(2)}`,data:vals,backgroundColor:'rgba(99,102,241,.15)',borderColor:'#6366f1',borderWidth:2,pointBackgroundColor:'#6366f1',pointBorderColor:'#fff',pointRadius:4}]},
+        options:{...CO, scales:{r:{beginAtZero:true,max:m.maxRating+.5,grid:{color:'#334155'},angleLines:{color:'#334155'},pointLabels:{color:'#94a3b8',font:{size:10}},ticks:{color:'#94a3b8',backdropColor:'#0f172a'}}}}
+    });
+
+    // 3 - Distribution (only for "all" filter where we have actual distribution data)
+    if (currentFilter === 'all' && m.distribution) {
+        addCard(grid,'cDist','fa-chart-area','Distribusi Penilaian');
+        const ds = [];
+        for (let i=1;i<=m.maxRating;i++) ds.push({
+            label:ratingLabel[i]||`Nilai ${i}`, data:Object.values(m.distribution).map(d=>d[i]||0),
+            backgroundColor:(ratingColor[i]||'#6366f1')+'55',borderColor:ratingColor[i]||'#6366f1',borderWidth:1,borderRadius:4
+        });
+        charts.dist = new Chart(document.getElementById('cDist'), {
+            type:'bar', data:{labels,datasets:ds},
+            options:{...CO,scales:{y:{stacked:true,beginAtZero:true,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},x:{stacked:true,grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:45}}}}
+        });
+    }
+
+    // 4 - Doughnut (overall satisfaction)
+    addCard(grid,'cPie','fa-circle-half-stroke','Distribusi Tingkat Kepuasan');
+    const overallDist = {};
+    for (let i=1;i<=m.maxRating;i++) overallDist[i]=0;
+    if (currentFilter === 'all' && m.distribution) {
+        for (const d of Object.values(m.distribution)) for (let i=1;i<=m.maxRating;i++) overallDist[i]+=d[i]||0;
+    }
+    const tv=Object.values(overallDist).reduce((a,b)=>a+b,0);
+    const pL=[],pD=[],pC=[];
+    for (let i=m.maxRating;i>=1;i--) if(overallDist[i]>0){pL.push(ratingLabel[i]);pD.push(overallDist[i]);pC.push(ratingColor[i]);}
+    charts.pie = new Chart(document.getElementById('cPie'), {
+        type:'doughnut', data:{labels:pL,datasets:[{data:pD,backgroundColor:pC.map(c=>c+'99'),borderColor:pC,borderWidth:2}]},
+        options:{...CO,cutout:'55%',plugins:{...CO.plugins,legend:{position:'bottom',labels:{color:'#f1f5f9',padding:12}},
+            tooltip:{...CO.plugins.tooltip,callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed} (${((ctx.parsed/tv)*100).toFixed(1)}%)`}}}}
+    });
+
+    // 5 - Trend
+    if (m.trend && m.trend.length > 1) {
+        addCard(grid,'cTrend','fa-timeline','Trend IKM per Bulan',true);
+        charts.trend = new Chart(document.getElementById('cTrend'), {
+            type:'line', data:{labels:m.trend.map(t=>t.date),datasets:[
+                {label:'IKM',data:m.trend.map(t=>t.ikm),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.1)',borderWidth:2,fill:true,tension:.3,pointRadius:4,pointBackgroundColor:'#6366f1'},
+                {label:'Responden',data:m.trend.map(t=>t.count),borderColor:'#f59e0b',borderWidth:2,fill:false,tension:.3,pointRadius:3,yAxisID:'y1'}
+            ]},
+            options:{...CO,scales:{y:{beginAtZero:true,max:m.maxRating+.5,grid:{color:'#334155'},ticks:{color:'#94a3b8'},title:{display:true,text:'IKM',color:'#94a3b8'}},
+                y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{color:'#94a3b8'},title:{display:true,text:'Responden',color:'#94a3b8'}},
+                x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}}}}
+        });
+    }
+
+    // 6 - Group comparison
+    const ga = m.groupAnalysis;
+    if (Object.keys(ga).length > 1) {
+        const sortedUnits = Object.keys(ga).sort((a,b)=>ga[b].ikm-ga[a].ikm);
+        const gV = sortedUnits.map(u=>ga[u].ikm);
+        const gN = sortedUnits.map(u=>ga[u].count);
+        const gC = gV.map(cc);
+        addCard(grid,'cGroup','fa-building','Perbandingan IKM per Unit',true);
+        charts.group = new Chart(document.getElementById('cGroup'), {
+            type:'bar', data:{labels:sortedUnits,datasets:[{label:'IKM',data:gV,backgroundColor:gC.map(c=>c+'33'),borderColor:gC,borderWidth:2,borderRadius:6}]},
+            options:{...CO,scales:{y:{beginAtZero:true,max:m.maxRating+.5,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},
+                x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:45}}},
+                plugins:{...CO.plugins,tooltip:{...CO.plugins.tooltip,callbacks:{afterLabel:ctx=>`Responden: ${gN[ctx.dataIndex]}`}}}}
+        });
+    }
+}
+
+function renderTable(m) {
+    const fa = getFilteredAnalysis(m);
+    let html = `<thead><tr><th>No</th><th>Unsur Pelayanan</th><th>NPU</th><th>Skala</th><th>Mutu</th></tr></thead><tbody>`;
+    Object.entries(fa.npu).forEach(([name, v], i) => {
+        let g='D'; for(const[gr,r]of Object.entries(SKM_SCALE)){if(v>=r.min&&v<=r.max){g=gr;break;}} if(v>4)g='A';
+        html += `<tr><td class="numeric">${i+1}</td><td>${name}</td><td class="numeric" style="font-weight:700;color:${cc(v)}">${v.toFixed(2)}</td><td class="numeric">1-${m.maxRating}</td><td><span class="quality-badge quality-${g}">${g} - ${SKM_SCALE[g]?.label||'Sangat Baik'}</span></td></tr>`;
+    });
+    html += `<tr style="background:rgba(99,102,241,.1);font-weight:700"><td></td><td>IKM (Indeks Kepuasan Masyarakat)</td><td class="numeric" style="font-size:16px">${fa.ikm.toFixed(2)}</td><td class="numeric">1-${m.maxRating}</td><td><span class="quality-badge quality-${fa.qualityGrade}" style="font-size:13px">${fa.qualityGrade} - ${SKM_SCALE[fa.qualityGrade]?.label||'Sangat Baik'}</span></td></tr></tbody>`;
+    document.getElementById('detailTable').innerHTML = html;
+}
+
+async function refreshData() {
+    document.getElementById('refreshIcon').classList.add('fa-spin');
+    document.getElementById('syncDot').className='sync-dot loading';
+    document.getElementById('syncText').textContent='Menyinkronkan...';
+    try { await fetch(API_REFRESH); } catch {}
+    try { const m = await fetchMetrics(); currentFilter='all'; renderDashboard(m); }
+    catch(e) { document.getElementById('loading').classList.add('hidden'); document.getElementById('mainContent').style.display='none'; document.getElementById('errorState').style.display='block'; document.getElementById('errorMsg').textContent=e.message; document.getElementById('syncDot').className='sync-dot offline'; document.getElementById('syncText').textContent='Offline'; }
+    document.getElementById('refreshIcon').classList.remove('fa-spin');
+}
+
+(async()=>{
+    try{const m=await fetchMetrics(); renderDashboard(m); refreshTimer=setInterval(refreshData,REFRESH_INTERVAL);}
+    catch(e){document.getElementById('loading').classList.add('hidden');document.getElementById('errorState').style.display='block';document.getElementById('errorMsg').textContent=e.message;document.getElementById('syncDot').className='sync-dot offline';document.getElementById('syncText').textContent='Offline';}
+})();
+</script>
+</body>
+</html>
