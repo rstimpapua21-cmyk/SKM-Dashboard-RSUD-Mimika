@@ -271,7 +271,10 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
         if path == '/' or path == '/dashboard':
             return os.path.join(SERVE_DIR, 'SKM Dashboard RSUD Mimika.html')
-        return os.path.join(SERVE_DIR, path.lstrip('/'))
+        resolved = os.path.normpath(os.path.join(SERVE_DIR, path.lstrip('/')))
+        if not resolved.startswith(SERVE_DIR):
+            return os.path.join(SERVE_DIR, 'index.html')
+        return resolved
 
     def do_GET(self):
         if self.path == '/api/metrics':
@@ -301,7 +304,10 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', 'http://localhost:%d' % PORT)
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'no-referrer')
         self.end_headers()
         self.wfile.write(body)
 

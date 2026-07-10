@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://docs.google.com; font-src https://cdnjs.cloudflare.com;">
     <title>Dashboard SKM RSUD Mimika</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g" crossorigin="anonymous">
     <style>
         :root{--p:#6366f1;--pl:#818cf8;--a:#f59e0b;--s:#10b981;--d:#ef4444;--bd:#0f172a;--bc:#1e293b;--bh:#334155;--t1:#f1f5f9;--t2:#94a3b8;--t3:#64748b;--br:#334155;--g1:linear-gradient(135deg,#6366f1,#8b5cf6);--g2:linear-gradient(135deg,#f59e0b,#ef4444);--g3:linear-gradient(135deg,#10b981,#06b6d4);--g4:linear-gradient(135deg,#3b82f6,#6366f1)}
         *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bd);color:var(--t1);min-height:100vh;overflow-x:hidden}
@@ -52,10 +53,11 @@
 <script>
 /* ===== CONFIG ===== */
 const PUB_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKRFBkIZHy-c8Es94dcyMg43OocyUvcOFJgB8i0zpjLALZdG4cjJzohb0jzdPZs6cqubhVnkLI1NL/pub?output=csv';
-const CORS_PROXIES = [
-    'https://corsproxy.io/?' + encodeURIComponent(PUB_CSV),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(PUB_CSV)
-];
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 const SKM_SCALE = {
     A: { min: 3.51, max: 4.00, label: 'Sangat Baik' },
@@ -165,66 +167,22 @@ function parseCSV(csvText) {
 
 /* ===== Fetch Data ===== */
 async function fetchData() {
-    const errors = [];
-
-    // Method 1: Direct CSV (CORS confirmed — Access-Control-Allow-Origin: *)
-    console.log('[SKM] Method 1: Direct CSV fetch');
-    try {
-        const response = await fetch(PUB_CSV, { mode: 'cors' });
-        if (response.ok) {
-            console.log('[SKM] Direct CSV: HTTP ' + response.status);
-            const csvText = await response.text();
-            console.log('[SKM] CSV size: ' + csvText.length + ' chars, ' + csvText.split(/\r?\n/).length + ' lines');
-            const parsed = parseCSV(csvText);
-            const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
-            const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
-            console.log('[SKM] Question columns: ' + qCols.length + ', Valid rows: ' + validRows.length + ' / ' + parsed.data.length);
-            if (validRows.length > 0) {
-                fetchMethod = 'Direct CSV';
-                return { headers: parsed.headers, data: validRows };
-            }
-            errors.push('Direct CSV: 0 valid rows after parsing');
-        } else {
-            errors.push('Direct CSV: HTTP ' + response.status);
-        }
-    } catch (e) {
-        errors.push('Direct CSV: ' + e.message);
-        console.error('[SKM] Direct CSV error:', e);
+    console.log('[SKM] Fetching CSV directly');
+    const response = await fetch(PUB_CSV, { mode: 'cors' });
+    if (!response.ok) {
+        throw new Error('Gagal memuat data: HTTP ' + response.status);
     }
-
-    // Method 2: CORS proxies
-    for (let pi = 0; pi < CORS_PROXIES.length; pi++) {
-        const proxyUrl = CORS_PROXIES[pi];
-        console.log('[SKM] Method 2.' + (pi+1) + ': CORS Proxy');
-        try {
-            const response = await fetch(proxyUrl);
-            if (response.ok) {
-                const csvText = await response.text();
-                // Check if it's actually CSV (not HTML error page)
-                if (!csvText.trim().startsWith('<!') && !csvText.trim().startsWith('<html')) {
-                    const parsed = parseCSV(csvText);
-                    const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
-                    const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
-                    if (validRows.length > 0) {
-                        fetchMethod = 'CORS Proxy #' + (pi+1);
-                        return { headers: parsed.headers, data: validRows };
-                    }
-                    errors.push('CORS Proxy #' + (pi+1) + ': 0 valid rows');
-                } else {
-                    errors.push('CORS Proxy #' + (pi+1) + ': returned HTML, not CSV');
-                }
-            } else {
-                errors.push('CORS Proxy #' + (pi+1) + ': HTTP ' + response.status);
-            }
-        } catch (e) {
-            errors.push('CORS Proxy #' + (pi+1) + ': ' + e.message);
-        }
+    const csvText = await response.text();
+    console.log('[SKM] CSV size: ' + csvText.length + ' chars, ' + csvText.split(/\r?\n/).length + ' lines');
+    const parsed = parseCSV(csvText);
+    const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
+    const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
+    console.log('[SKM] Question columns: ' + qCols.length + ', Valid rows: ' + validRows.length + ' / ' + parsed.data.length);
+    if (validRows.length === 0) {
+        throw new Error('Data CSV tidak valid: 0 baris data yang bisa diproses');
     }
-
-    // All methods failed
-    const msg = 'Semua metode gagal: ' + errors.join('; ');
-    console.error('[SKM] All fetch methods failed:', errors);
-    throw new Error(msg);
+    fetchMethod = 'Direct CSV';
+    return { headers: parsed.headers, data: validRows };
 }
 
 /* ===== Analysis ===== */
@@ -370,7 +328,7 @@ function render(d) {
     let filterHtml = '<span class="fl"><i class="fas fa-filter"></i> Unit:</span>';
     filterHtml += '<select id="fg" onchange="applyFilter()">';
     filterHtml += '<option value="all">Semua Unit (' + d.total + ')</option>';
-    filterHtml += units.map(u => '<option value="'+u+'">'+u+' ('+d.groupAnalysis[u].count+')</option>').join('');
+    filterHtml += units.map(u => '<option value="'+escapeHtml(u)+'">'+escapeHtml(u)+' ('+d.groupAnalysis[u].count+')</option>').join('');
     filterHtml += '</select>';
     document.getElementById('fb').innerHTML = filterHtml;
 
@@ -414,7 +372,7 @@ function destroyCharts() { Object.values(charts).forEach(c => c.destroy()); char
 function addChartCard(grid, id, icon, title, fullWidth) {
     const div = document.createElement('div');
     div.className = 'cc' + (fullWidth ? ' cf' : '');
-    div.innerHTML = '<h3><i class="fas ' + icon + '"></i> ' + title + '</h3><div class="cw"><canvas id="' + id + '"></canvas></div>';
+    div.innerHTML = '<h3><i class="fas ' + icon + '"></i> ' + escapeHtml(title) + '</h3><div class="cw"><canvas id="' + id + '"></canvas></div>';
     grid.appendChild(div);
 }
 
@@ -591,7 +549,7 @@ function renderTable(d) {
             if (v >= range.min && v <= range.max) { grade = g; break; }
         }
         if (v > 4) grade = 'A';
-        html += '<tr><td class="n">' + (i+1) + '</td><td>' + shortName(c) + '</td>';
+        html += '<tr><td class="n">' + (i+1) + '</td><td>' + escapeHtml(shortName(c)) + '</td>';
         html += '<td class="n" style="font-weight:700;color:' + colorByGrade(v) + '">' + v.toFixed(2) + '</td>';
         html += '<td class="n">1-' + d.maxRating + '</td>';
         html += '<td><span class="qb q' + grade + '">' + grade + ' - ' + (SKM_SCALE[grade]?.label||'Sangat Baik') + '</span></td></tr>';
