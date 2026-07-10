@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://docs.google.com; font-src https://cdnjs.cloudflare.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://docs.google.com https://www.google.com https://spreadsheets.google.com; font-src https://cdnjs.cloudflare.com;">
     <title>Dashboard SKM RSUD Mimika</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g" crossorigin="anonymous">
@@ -53,6 +53,7 @@
 <script>
 /* ===== CONFIG ===== */
 const PUB_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKRFBkIZHy-c8Es94dcyMg43OocyUvcOFJgB8i0zpjLALZdG4cjJzohb0jzdPZs6cqubhVnkLI1NL/pub?output=csv';
+const GVIZ_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKRFBkIZHy-c8Es94dcyMg43OocyUvcOFJgB8i0zpjLALZdG4cjJzohb0jzdPZs6cqubhVnkLI1NL/pub?output=csv&gid=0';
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -166,23 +167,49 @@ function parseCSV(csvText) {
 }
 
 /* ===== Fetch Data ===== */
+function isValidCSV(text) {
+    if (!text || text.length < 20) return false;
+    if (text.trim().startsWith('<') || text.trim().startsWith('{')) return false;
+    const firstLine = text.split(/\r?\n/)[0];
+    if (!firstLine || firstLine.split(',').length < 3) return false;
+    return true;
+}
+
 async function fetchData() {
-    console.log('[SKM] Fetching CSV directly');
-    const response = await fetch(PUB_CSV, { mode: 'cors' });
-    if (!response.ok) {
-        throw new Error('Gagal memuat data: HTTP ' + response.status);
+    const sources = [
+        { url: PUB_CSV, label: 'Direct CSV', mode: 'cors' },
+        { url: GVIZ_CSV, label: 'Google CSV (fallback)', mode: 'cors' }
+    ];
+
+    for (const src of sources) {
+        try {
+            console.log('[SKM] Trying: ' + src.label);
+            const response = await fetch(src.url, { mode: src.mode });
+            if (!response.ok) {
+                console.warn('[SKM] ' + src.label + ' HTTP ' + response.status);
+                continue;
+            }
+            const csvText = await response.text();
+            if (!isValidCSV(csvText)) {
+                console.warn('[SKM] ' + src.label + ' response not valid CSV');
+                continue;
+            }
+            console.log('[SKM] CSV size: ' + csvText.length + ' chars, ' + csvText.split(/\r?\n/).length + ' lines');
+            const parsed = parseCSV(csvText);
+            const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
+            const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
+            console.log('[SKM] Question columns: ' + qCols.length + ', Valid rows: ' + validRows.length + ' / ' + parsed.data.length);
+            if (validRows.length === 0) {
+                console.warn('[SKM] ' + src.label + ' no valid data rows');
+                continue;
+            }
+            fetchMethod = src.label;
+            return { headers: parsed.headers, data: validRows };
+        } catch (e) {
+            console.warn('[SKM] ' + src.label + ' failed: ' + e.message);
+        }
     }
-    const csvText = await response.text();
-    console.log('[SKM] CSV size: ' + csvText.length + ' chars, ' + csvText.split(/\r?\n/).length + ' lines');
-    const parsed = parseCSV(csvText);
-    const qCols = parsed.headers.filter(h => h && /^\d\./.test(h.trim()));
-    const validRows = parsed.data.filter(row => qCols.some(c => typeof row[c] === 'number' && row[c] > 0));
-    console.log('[SKM] Question columns: ' + qCols.length + ', Valid rows: ' + validRows.length + ' / ' + parsed.data.length);
-    if (validRows.length === 0) {
-        throw new Error('Data CSV tidak valid: 0 baris data yang bisa diproses');
-    }
-    fetchMethod = 'Direct CSV';
-    return { headers: parsed.headers, data: validRows };
+    throw new Error('Gagal memuat data dari semua sumber. Pastikan Google Sheets dipublikasi.');
 }
 
 /* ===== Analysis ===== */
